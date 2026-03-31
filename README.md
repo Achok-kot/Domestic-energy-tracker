@@ -1,6 +1,9 @@
 # EnergyIQ — Domestic Energy Tracker
 
-A web application that helps users track home energy usage, estimate electricity costs, and monitor carbon footprint — powered by real-time data from the EIA and Electricity Maps APIs.
+A web application that helps users track home energy usage, it help households take control of their energy consumption by 
+ tracking their usage. With the growing electricity prices, if one knows exactly how much they consume, then it will empower them to make 
+smart decisions in order to reduce bills and this will contribute to a more sustainable future.
+The app is powered by real-time data from the EIA and Electricity Maps APIs.
 
 **Live Demo:** https://achok-kot.tech
 
