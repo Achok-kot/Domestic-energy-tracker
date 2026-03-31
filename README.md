@@ -2,7 +2,7 @@
 
 A web application that helps users track home energy usage, estimate electricity costs, and monitor carbon footprint — powered by real-time data from the EIA and Electricity Maps APIs.
 
-**Live Demo:** http://52.23.253.48 (Load Balancer)
+**Live Demo:** https://achok-kot.tech
 
 ---
 
