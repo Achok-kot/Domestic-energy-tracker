@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EnergyIQ — Domestic Energy Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0a0e17;--bg2:#111827;--bg3:#1a2235;--card:#141c2e;
+    --border:rgba(99,179,237,0.12);--accent:#38bdf8;--accent2:#818cf8;
+    --accent3:#34d399;--warn:#fb923c;--danger:#f87171;
+    --text:#e2e8f0;--muted:#64748b;
+    --font-head:'Syne',sans-serif;--font-body:'DM Sans',sans-serif;
+    --radius:14px;--glow:0 0 40px rgba(56,189,248,0.06);
+    --cat-cooking:#fb923c;--cat-appliances:#38bdf8;
+    --cat-electronics:#818cf8;--cat-lighting:#fbbf24;--cat-heating:#34d399;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:15px;min-height:100vh;line-height:1.6}
+  body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 60% 50% at 10% 20%,rgba(56,189,248,0.05) 0%,transparent 60%),radial-gradient(ellipse 50% 60% at 90% 80%,rgba(129,140,248,0.05) 0%,transparent 60%);pointer-events:none;z-index:0}
+  .wrap{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:0 24px}
+  nav{border-bottom:1px solid var(--border);background:rgba(10,14,23,0.9);backdrop-filter:blur(12px);position:sticky;top:0;z-index:100}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;max-width:1280px;margin:0 auto}
+  .logo{font-family:var(--font-head);font-size:22px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+  .logo span{-webkit-text-fill-color:var(--accent3)}
+  .nav-tabs{display:flex;gap:4px}
+  .tab-btn{background:none;border:none;color:var(--muted);padding:8px 14px;border-radius:8px;cursor:pointer;font-family:var(--font-body);font-size:14px;font-weight:500;transition:all 0.2s}
+  .tab-btn:hover{color:var(--text);background:rgba(255,255,255,0.05)}
+  .tab-btn.active{color:var(--accent);background:rgba(56,189,248,0.1)}
+  .nav-right{display:flex;align-items:center;gap:10px}
+  .badge{background:rgba(56,189,248,0.15);color:var(--accent);border:1px solid rgba(56,189,248,0.25);padding:4px 10px;border-radius:20px;font-size:12px;font-weight:500}
+  .user-chip{display:flex;align-items:center;gap:8px;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.2);border-radius:20px;padding:5px 14px 5px 10px;cursor:pointer;font-size:13px;font-weight:500;color:var(--accent);transition:all 0.2s}
+  .user-chip:hover{background:rgba(56,189,248,0.18)}
+  .user-dot{width:8px;height:8px;border-radius:50%;background:var(--accent3)}
+  .section{display:none;padding:32px 0 64px}
+  .section.active{display:block}
+  .modal-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:20px}
+  .modal-overlay.hidden{display:none}
+  .modal{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:36px 40px;width:100%;max-width:420px;box-shadow:0 24px 80px rgba(0,0,0,0.5)}
+  .modal-title{font-family:var(--font-head);font-size:24px;font-weight:800;margin-bottom:6px}
+  .modal-sub{color:var(--muted);font-size:14px;margin-bottom:24px}
+  .modal-tabs{display:flex;gap:4px;margin-bottom:24px;background:var(--bg3);border-radius:10px;padding:4px}
+  .modal-tab{flex:1;padding:9px;border-radius:7px;border:none;cursor:pointer;font-family:var(--font-head);font-size:14px;font-weight:700;background:none;color:var(--muted);transition:all 0.2s}
+  .modal-tab.active{background:var(--card);color:var(--text)}
+  .modal-error{color:var(--danger);font-size:13px;margin-top:10px;min-height:18px}
+  .hero{background:linear-gradient(135deg,rgba(56,189,248,0.08),rgba(129,140,248,0.06));border:1px solid var(--border);border-radius:var(--radius);padding:36px 40px;margin-bottom:28px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
+  .hero-text h1{font-family:var(--font-head);font-size:34px;font-weight:800;line-height:1.1;margin-bottom:8px}
+  .hero-text h1 em{font-style:normal;color:var(--accent)}
+  .hero-text p{color:var(--muted);font-size:14px;max-width:380px}
+  .hero-stats{display:flex;gap:28px;flex-wrap:wrap}
+  .hstat{text-align:center}
+  .hstat-val{font-family:var(--font-head);font-size:30px;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+  .hstat-label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.8px;margin-top:2px}
+  .cat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:28px}
+  @media(max-width:900px){.cat-grid{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:600px){.cat-grid{grid-template-columns:repeat(2,1fr)}}
+  .cat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 16px;text-align:center;transition:all 0.2s;border-top:3px solid transparent}
+  .cat-card:hover{transform:translateY(-2px)}
+  .cat-name{font-family:var(--font-head);font-size:13px;font-weight:700;margin-bottom:4px}
+  .cat-kwh{font-size:12px;color:var(--muted)}
+  .cat-bar{height:3px;border-radius:2px;margin-top:10px;background:rgba(255,255,255,0.06)}
+  .cat-bar-fill{height:100%;border-radius:2px;transition:width 0.5s ease}
+  .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:24px}
+  .kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--glow);transition:transform 0.2s}
+  .kpi:hover{transform:translateY(-2px)}
+  .kpi-label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px}
+  .kpi-val{font-family:var(--font-head);font-size:26px;font-weight:700}
+  .kpi-val.green{color:var(--accent3)}.kpi-val.blue{color:var(--accent)}.kpi-val.purple{color:var(--accent2)}.kpi-val.warn{color:var(--warn)}
+  .kpi-sub{color:var(--muted);font-size:12px;margin-top:4px}
+  .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px}
+  @media(max-width:860px){.charts-grid{grid-template-columns:1fr}}
+  .chart-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:22px;box-shadow:var(--glow)}
+  .chart-card.full{grid-column:1/-1}
+  .chart-title{font-family:var(--font-head);font-size:15px;font-weight:700;margin-bottom:2px}
+  .chart-sub{color:var(--muted);font-size:12px;margin-bottom:18px}
+  .chart-wrap{position:relative;height:220px}
+  .chart-wrap.tall{height:280px}
+  .price-strip{background:linear-gradient(135deg,rgba(52,211,153,0.08),rgba(56,189,248,0.06));border:1px solid rgba(52,211,153,0.15);border-radius:var(--radius);padding:14px 20px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;margin-bottom:22px}
+  .price-label{color:var(--muted);font-size:12px}
+  .price-val{font-family:var(--font-head);font-size:18px;font-weight:700;color:var(--accent3)}
+  .price-source{color:var(--muted);font-size:11px;margin-left:auto}
+  .api-loading{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warn);animation:blink 1.2s ease-in-out infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+  .form-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px 30px;margin-bottom:24px;box-shadow:var(--glow)}
+  .form-title{font-family:var(--font-head);font-size:20px;font-weight:700;margin-bottom:20px}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+  @media(max-width:600px){.form-row{grid-template-columns:1fr}}
+  .form-group{display:flex;flex-direction:column;gap:6px}
+  label{font-size:12px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:0.5px}
+  input,select{background:var(--bg3);border:1px solid rgba(255,255,255,0.08);border-radius:8px;color:var(--text);padding:10px 14px;font-family:var(--font-body);font-size:14px;outline:none;transition:border-color 0.2s}
+  input:focus,select:focus{border-color:rgba(56,189,248,0.4)}
+  select option{background:var(--bg2)}
+  .cat-select-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  .cat-btn{padding:9px 16px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:var(--bg3);color:var(--muted);cursor:pointer;font-family:var(--font-body);font-size:13px;font-weight:500;transition:all 0.2s;white-space:nowrap}
+  .cat-btn:hover{border-color:rgba(255,255,255,0.25);color:var(--text)}
+  .cat-btn.selected{color:#0a0e17;font-weight:700;border-color:transparent}
+  .btn{padding:10px 22px;border-radius:10px;font-family:var(--font-head);font-size:14px;font-weight:700;cursor:pointer;border:none;transition:all 0.2s}
+  .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#0a0e17}
+  .btn-primary:hover{opacity:0.9;transform:translateY(-1px)}
+  .btn-danger{background:rgba(248,113,113,0.12);color:var(--danger);border:1px solid rgba(248,113,113,0.2);font-size:12px;padding:5px 10px;border-radius:6px}
+  .btn-danger:hover{background:rgba(248,113,113,0.22)}
+  .table-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--glow)}
+  .table-toolbar{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .search-box{flex:1;min-width:160px;background:var(--bg3);border:1px solid rgba(255,255,255,0.08);border-radius:8px;color:var(--text);padding:8px 14px;font-family:var(--font-body);font-size:14px;outline:none}
+  .search-box:focus{border-color:rgba(56,189,248,0.4)}
+  .filter-sel{background:var(--bg3);border:1px solid rgba(255,255,255,0.08);border-radius:8px;color:var(--text);padding:8px 12px;font-family:var(--font-body);font-size:13px;outline:none;cursor:pointer}
+  table{width:100%;border-collapse:collapse}
+  th{background:var(--bg3);padding:11px 14px;text-align:left;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;font-weight:500;cursor:pointer;white-space:nowrap;user-select:none}
+  th:hover,th.sorted{color:var(--accent)}
+  td{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:13px}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:rgba(255,255,255,0.02)}
+  .pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px}
+  .pill-cooking{background:rgba(251,146,60,0.15);color:var(--cat-cooking)}
+  .pill-appliances{background:rgba(56,189,248,0.15);color:var(--cat-appliances)}
+  .pill-electronics{background:rgba(129,140,248,0.15);color:var(--cat-electronics)}
+  .pill-lighting{background:rgba(251,191,36,0.15);color:var(--cat-lighting)}
+  .pill-heatingcooling{background:rgba(52,211,153,0.15);color:var(--cat-heating)}
+  .pill-low{background:rgba(52,211,153,0.12);color:var(--accent3)}
+  .pill-mid{background:rgba(251,146,60,0.12);color:var(--warn)}
+  .pill-high{background:rgba(248,113,113,0.12);color:var(--danger)}
+  .empty-state{text-align:center;padding:60px 20px;color:var(--muted);font-size:14px}
+  .tips-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:12px}
+  .tip-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;border-left:3px solid var(--accent3);transition:transform 0.2s}
+  .tip-card:hover{transform:translateY(-2px)}
+  .tip-title{font-weight:600;margin-bottom:6px;font-size:14px}
+  .tip-body{color:var(--muted);font-size:13px;line-height:1.55}
+  .settings-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:26px 30px;max-width:500px;box-shadow:var(--glow)}
+  .settings-title{font-family:var(--font-head);font-size:18px;font-weight:700;margin-bottom:18px}
+  .setting-row{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
+  .setting-row:last-child{border-bottom:none}
+  .setting-label{font-size:14px}
+  .setting-sub{font-size:12px;color:var(--muted);margin-top:2px}
+  .toast{position:fixed;bottom:24px;right:24px;z-index:9999;background:var(--accent3);color:#0a0e17;padding:12px 20px;border-radius:10px;font-weight:600;font-size:14px;transform:translateY(80px);opacity:0;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1)}
+  .toast.show{transform:translateY(0);opacity:1}
+  .calc-preview{background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.15);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--accent);margin-top:4px;display:none}
+  .calc-preview.show{display:block}
+  ::-webkit-scrollbar{width:6px}
+  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:3px}
+  @media(max-width:640px){.hero{flex-direction:column}.hero-stats{justify-content:space-around;width:100%}.hero-text h1{font-size:26px}.nav-tabs .tab-btn{padding:7px 10px;font-size:12px}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <div class="logo">Energy<span>IQ</span></div>
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="showTab('dashboard',this)">Dashboard</button>
+      <button class="tab-btn" onclick="showTab('log',this)">Log Usage</button>
+      <button class="tab-btn" onclick="showTab('appliances',this)">History</button>
+      <button class="tab-btn" onclick="showTab('tips',this)">Tips</button>
+      <button class="tab-btn" onclick="showTab('settings',this)">Settings</button>
+    </div>
+    <div class="nav-right">
+      <span class="badge" id="month-badge">Loading...</span>
+      <div id="nav-auth"><button class="btn btn-primary" onclick="showAuthModal()" style="font-size:13px;padding:7px 16px">Sign In</button></div>
+      <div id="nav-user" style="display:none">
+        <div class="user-chip" onclick="logout()">
+          <div class="user-dot"></div>
+          <span id="nav-username">user</span>
+          &nbsp;· Sign out
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay hidden" id="auth-modal">
+  <div class="modal">
+    <div class="modal-title">Welcome to EnergyIQ</div>
+    <div class="modal-sub">Track your home energy by category.</div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" id="tab-login" onclick="switchAuthTab('login')">Sign In</button>
+      <button class="modal-tab" id="tab-register" onclick="switchAuthTab('register')">Register</button>
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label>Username</label>
+      <input id="auth-username" type="text" placeholder="e.g. john_doe">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input id="auth-password" type="password" placeholder="Min. 8 chars, 1 uppercase, 1 number">
+    </div>
+    <div id="auth-error" class="modal-error"></div>
+    <button class="btn btn-primary" onclick="submitAuth()" style="width:100%;margin-top:16px;padding:13px">
+      <span id="auth-btn-text">Sign In</span>
+    </button>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="section active wrap" id="sec-dashboard">
+  <div class="hero">
+    <div class="hero-text">
+      <h1>Your <em>Energy</em> Dashboard</h1>
+      <p>Track domestic energy usage across Cooking, Appliances, Electronics, Lighting and Heating/Cooling.</p>
+    </div>
+    <div class="hero-stats">
+      <div class="hstat"><div class="hstat-val" id="h-kwh">0</div><div class="hstat-label">kWh this month</div></div>
+      <div class="hstat"><div class="hstat-val" id="h-cost">$0</div><div class="hstat-label">Est. Cost</div></div>
+      <div class="hstat"><div class="hstat-val" id="h-co2">0 kg</div><div class="hstat-label">CO2 Emitted</div></div>
+    </div>
+  </div>
+  <div class="price-strip">
+    <div><div class="price-label">Electricity Rate</div><div class="price-val" id="price-val"><span class="api-loading"></span> Fetching...</div></div>
+    <div><div class="price-label">Carbon Intensity</div><div class="price-val" id="carbon-val"><span class="api-loading"></span></div></div>
+    <div class="price-source" id="price-source"></div>
+  </div>
+  <div class="cat-grid" id="cat-overview"></div>
+  <div class="kpi-row">
+    <div class="kpi"><div class="kpi-label">Daily Average</div><div class="kpi-val blue" id="kpi-daily">0 kWh</div><div class="kpi-sub">per day this month</div></div>
+    <div class="kpi"><div class="kpi-label">Top Category</div><div class="kpi-val purple" id="kpi-top">-</div><div class="kpi-sub">highest consumer</div></div>
+    <div class="kpi"><div class="kpi-label">Entries This Month</div><div class="kpi-val green" id="kpi-logs">0</div><div class="kpi-sub">usage logs</div></div>
+    <div class="kpi"><div class="kpi-label">Efficiency Score</div><div class="kpi-val warn" id="kpi-score">A+</div><div class="kpi-sub">based on usage</div></div>
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card"><div class="chart-title">Daily Consumption</div><div class="chart-sub">kWh per day - last 14 days</div><div class="chart-wrap"><canvas id="chart-daily"></canvas></div></div>
+    <div class="chart-card"><div class="chart-title">Usage by Category</div><div class="chart-sub">Share of total energy this month</div><div class="chart-wrap"><canvas id="chart-cat"></canvas></div></div>
+    <div class="chart-card full"><div class="chart-title">Monthly Cost Trend</div><div class="chart-sub">Estimated electricity cost - last 7 months</div><div class="chart-wrap tall"><canvas id="chart-cost"></canvas></div></div>
+  </div>
+</div>
+
+<!-- LOG USAGE -->
+<div class="section wrap" id="sec-log">
+  <div class="form-card">
+    <div class="form-title">Log Energy Usage</div>
+    <div style="margin-bottom:16px">
+      <label style="display:block;margin-bottom:8px">1. Select Category</label>
+      <div class="cat-select-row">
+        <button class="cat-btn" data-cat="Cooking" data-color="#fb923c" onclick="selectCategory(this)">Cooking</button>
+        <button class="cat-btn" data-cat="Appliances" data-color="#38bdf8" onclick="selectCategory(this)">Appliances</button>
+        <button class="cat-btn" data-cat="Electronics" data-color="#818cf8" onclick="selectCategory(this)">Electronics</button>
+        <button class="cat-btn" data-cat="Lighting" data-color="#fbbf24" onclick="selectCategory(this)">Lighting</button>
+        <button class="cat-btn" data-cat="Heating/Cooling" data-color="#34d399" onclick="selectCategory(this)">Heating / Cooling</button>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>2. Activity / Appliance</label>
+        <select id="f-appliance"><option value="">-- Select a category first --</option></select>
+      </div>
+      <div class="form-group">
+        <label>Custom Name (optional)</label>
+        <input id="f-custom" type="text" placeholder="e.g. Kitchen Oven">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Power Rating (Watts)</label>
+        <input id="f-watts" type="number" placeholder="e.g. 1500" min="1">
+      </div>
+      <div class="form-group">
+        <label>Hours Used</label>
+        <input id="f-hours" type="number" placeholder="e.g. 2.5" min="0.1" step="0.5">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Date</label>
+        <input id="f-date" type="date">
+      </div>
+      <div class="form-group">
+        <label>Room / Location</label>
+        <select id="f-room">
+          <option>Living Room</option><option>Kitchen</option><option>Bedroom</option>
+          <option>Bathroom</option><option>Laundry</option><option>Office</option>
+          <option>Garage</option><option>Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="calc-preview" id="calc-preview"></div>
+    <div style="margin-top:16px"><button class="btn btn-primary" onclick="logUsage()">Add Entry</button></div>
+  </div>
+  <h3 style="font-family:var(--font-head);font-size:18px;font-weight:700;margin-bottom:14px">Recent Entries</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Date</th><th>Category</th><th>Activity</th><th>Room</th><th>Watts</th><th>Hours</th><th>kWh</th><th>Cost</th><th></th></tr></thead>
+      <tbody id="recent-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- HISTORY -->
+<div class="section wrap" id="sec-appliances">
+  <div style="margin-bottom:20px">
+    <h2 style="font-family:var(--font-head);font-size:26px;font-weight:800;margin-bottom:4px">Usage History</h2>
+    <p style="color:var(--muted)">Search, filter and sort all your energy entries.</p>
+  </div>
+  <div class="table-wrap">
+    <div class="table-toolbar">
+      <input class="search-box" id="search-box" placeholder="Search activity or room..." oninput="renderTable()">
+      <select class="filter-sel" id="filter-cat" onchange="renderTable()">
+        <option value="">All Categories</option>
+        <option>Cooking</option><option>Appliances</option>
+        <option>Electronics</option><option>Lighting</option><option>Heating/Cooling</option>
+      </select>
+      <select class="filter-sel" id="filter-room" onchange="renderTable()">
+        <option value="">All Rooms</option>
+        <option>Living Room</option><option>Kitchen</option><option>Bedroom</option>
+        <option>Bathroom</option><option>Laundry</option><option>Office</option><option>Garage</option><option>Other</option>
+      </select>
+      <select class="filter-sel" id="filter-level" onchange="renderTable()">
+        <option value="">All Levels</option>
+        <option value="low">Low</option><option value="mid">Medium</option><option value="high">High</option>
+      </select>
+      <button class="btn btn-primary" onclick="exportCSV()" style="font-size:12px;padding:8px 14px">Export CSV</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th onclick="sortTable('date',this)">Date</th>
+          <th onclick="sortTable('category',this)">Category</th>
+          <th onclick="sortTable('appliance',this)">Activity</th>
+          <th onclick="sortTable('room',this)">Room</th>
+          <th onclick="sortTable('watts',this)">Watts</th>
+          <th onclick="sortTable('hours',this)">Hours</th>
+          <th onclick="sortTable('kwh',this)">kWh</th>
+          <th onclick="sortTable('cost',this)">Cost</th>
+          <th>Level</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="main-tbody"></tbody>
+    </table>
+    <div id="table-empty" class="empty-state" style="display:none">No entries yet. Start logging your energy usage!</div>
+  </div>
+</div>
+
+<!-- TIPS -->
+<div class="section wrap" id="sec-tips">
+  <div style="margin-bottom:20px">
+    <h2 style="font-family:var(--font-head);font-size:26px;font-weight:800;margin-bottom:4px">Energy Saving Tips</h2>
+    <p style="color:var(--muted)">Personalised advice based on your usage patterns.</p>
+  </div>
+  <div id="tips-personalized" style="margin-bottom:28px"></div>
+  <h3 style="font-family:var(--font-head);font-size:18px;font-weight:700;margin-bottom:14px">Tips by Category</h3>
+  <div class="tips-grid" id="tips-general"></div>
+</div>
+
+<!-- SETTINGS -->
+<div class="section wrap" id="sec-settings">
+  <h2 style="font-family:var(--font-head);font-size:26px;font-weight:800;margin-bottom:4px">Settings</h2>
+  <p style="color:var(--muted);margin-bottom:24px">Customize your electricity rate and preferences.</p>
+  <div class="settings-card">
+    <div class="settings-title">Preferences</div>
+    <div class="setting-row">
+      <div><div class="setting-label">Electricity Rate (per kWh)</div><div class="setting-sub">Used for cost calculations</div></div>
+      <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--muted);font-size:13px">$</span><input id="s-rate" type="number" value="0.13" step="0.01" min="0.01" style="width:80px;text-align:center"></div>
+    </div>
+    <div class="setting-row">
+      <div><div class="setting-label">Currency Symbol</div><div class="setting-sub">Shown in cost columns</div></div>
+      <select id="s-currency" style="width:100px">
+        <option value="$">$ USD</option><option value="EUR">EUR</option><option value="GBP">GBP</option>
+        <option value="RWF">RWF</option><option value="KSh">KSh</option><option value="NGN">NGN</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <div><div class="setting-label">CO2 Factor</div><div class="setting-sub">kg CO2 per kWh emitted</div></div>
+      <input id="s-co2" type="number" value="0.45" step="0.01" min="0.1" style="width:80px;text-align:center">
+    </div>
+    <div style="margin-top:18px;display:flex;gap:10px">
+      <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+      <button class="btn btn-danger" style="padding:10px 18px" onclick="clearAllData()">Clear All Data</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CATEGORIES = {
+  'Cooking':         { color:'#fb923c', appliances:['Electric Oven','Microwave','Electric Kettle','Toaster','Rice Cooker','Coffee Maker','Air Fryer','Slow Cooker','Other'] },
+  'Appliances':      { color:'#38bdf8', appliances:['Refrigerator','Washing Machine','Dryer','Dishwasher','Vacuum Cleaner','Iron','Water Heater','Other'] },
+  'Electronics':     { color:'#818cf8', appliances:['TV','Laptop','Desktop PC','Gaming Console','Phone Charger','Router / Modem','Sound System','Printer','Other'] },
+  'Lighting':        { color:'#fbbf24', appliances:['LED Bulbs','Fluorescent Lights','Incandescent Bulbs','Outdoor Lights','Night Light','Desk Lamp','Other'] },
+  'Heating/Cooling': { color:'#34d399', appliances:['AC Unit','Ceiling Fan','Space Heater','Electric Blanket','Dehumidifier','Air Purifier','Other'] }
+};
+const CAT_TIPS = {
+  'Cooking':         { title:'Cooking Efficiency',  body:'Use lids on pots to reduce cooking time by up to 30%. Match pot size to burner size and use residual heat to finish cooking.' },
+  'Appliances':      { title:'Appliance Habits',    body:'Run washing machines and dishwashers with full loads only. Clean dryer lint filters after every use for maximum efficiency.' },
+  'Electronics':     { title:'Electronics Standby', body:'Enable sleep mode on TVs and PCs. Unplug chargers when not in use - they draw power even when nothing is connected.' },
+  'Lighting':        { title:'Smarter Lighting',    body:'Switch to LED bulbs to use 75% less energy. Use motion sensors or timers to avoid lights being left on in empty rooms.' },
+  'Heating/Cooling': { title:'Climate Control',     body:'Set AC to 24-26 degrees. Use ceiling fans to circulate air. Service your AC unit annually to maintain efficiency.' }
+};
+const DEFAULT_WATTS = { 'Cooking':800, 'Appliances':700, 'Electronics':150, 'Lighting':60, 'Heating/Cooling':1200 };
+
+let sortKey      = 'date', sortDir = -1;
+let charts       = {};
+let selectedCat  = '';
+let authToken    = localStorage.getItem('energyiq_token')    || null;
+let authUsername = localStorage.getItem('energyiq_username') || null;
+let authMode     = 'login';
+
+function entriesKey()  { return 'energyiq_entries_'  + (authUsername || 'guest'); }
+function settingsKey() { return 'energyiq_settings_' + (authUsername || 'guest'); }
+
+let entries  = JSON.parse(localStorage.getItem(entriesKey())  || '[]');
+let settings = JSON.parse(localStorage.getItem(settingsKey()) || '{"rate":0.13,"currency":"$","co2":0.45}');
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+  loadSettings();
+  initCharts();
+  updateAll();
+  setMonthBadge();
+  renderTips();
+  ['f-watts','f-hours'].forEach(id => document.getElementById(id).addEventListener('input', updatePreview));
+  ['auth-username','auth-password'].forEach(id => document.getElementById(id).addEventListener('keydown', e => { if(e.key==='Enter') submitAuth(); }));
+  if (authToken) { loadUserData(); applyAuthUI(authUsername); fetchElectricityRate(); fetchCarbonIntensity(); }
+  else showAuthModal();
+});
+
+function setMonthBadge() {
+  document.getElementById('month-badge').textContent = new Date().toLocaleString('default',{month:'long',year:'numeric'});
+}
+
+function showTab(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(id==='appliances') renderTable();
+  if(id==='log') renderRecentTable();
+  if(id==='dashboard') { updateCharts(); updateKPIs(); }
+}
+
+function showAuthModal() { document.getElementById('auth-modal').classList.remove('hidden'); setTimeout(()=>document.getElementById('auth-username').focus(),100); }
+function hideAuthModal() { document.getElementById('auth-modal').classList.add('hidden'); }
+
+function switchAuthTab(mode) {
+  authMode = mode;
+  document.getElementById('tab-login').classList.toggle('active', mode==='login');
+  document.getElementById('tab-register').classList.toggle('active', mode==='register');
+  document.getElementById('auth-btn-text').textContent = mode==='login' ? 'Sign In' : 'Create Account';
+  document.getElementById('auth-error').textContent = '';
+  document.getElementById('auth-username').value = '';
+  document.getElementById('auth-password').value = '';
+  document.getElementById('auth-username').focus();
+}
+
+function loadUserData() {
+  entries  = JSON.parse(localStorage.getItem(entriesKey())  || '[]');
+  settings = JSON.parse(localStorage.getItem(settingsKey()) || '{"rate":0.13,"currency":"$","co2":0.45}');
+  loadSettings();
+  updateAll();
+}
+
+function applyAuthUI(username) {
+  document.getElementById('nav-auth').style.display = 'none';
+  document.getElementById('nav-user').style.display = 'flex';
+  document.getElementById('nav-username').textContent = username;
+  hideAuthModal();
+  loadUserData();
+}
+
+async function submitAuth() {
+  const username = document.getElementById('auth-username').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const errorEl  = document.getElementById('auth-error');
+  const btnText  = document.getElementById('auth-btn-text');
+  errorEl.textContent = '';
+  if (!username || username.length < 3)               { errorEl.textContent = 'Username must be at least 3 characters.'; return; }
+  if (!/^[a-zA-Z0-9_]+$/.test(username))             { errorEl.textContent = 'Username: letters, numbers and underscores only.'; return; }
+  if (!password || password.length < 8)               { errorEl.textContent = 'Password must be at least 8 characters.'; return; }
+  if (authMode==='register' && !/[A-Z]/.test(password)) { errorEl.textContent = 'Password needs at least one uppercase letter.'; return; }
+  if (authMode==='register' && !/[0-9]/.test(password)) { errorEl.textContent = 'Password needs at least one number.'; return; }
+  btnText.textContent = 'Please wait...';
+  try {
+    const res  = await fetch(authMode==='login' ? '/api/auth/login' : '/api/auth/register', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username,password}) });
+    const data = await res.json();
+    if (!res.ok) { errorEl.textContent = data.error || 'Something went wrong.'; btnText.textContent = authMode==='login'?'Sign In':'Create Account'; return; }
+    authToken = data.token; authUsername = data.username;
+    localStorage.setItem('energyiq_token', authToken);
+    localStorage.setItem('energyiq_username', authUsername);
+    applyAuthUI(authUsername);
+    fetchElectricityRate(); fetchCarbonIntensity();
+    loadUserData();
+    toast(authMode==='login' ? 'Welcome back, '+authUsername+'!' : 'Account created! Welcome, '+authUsername+'!');
+  } catch(err) { errorEl.textContent = 'Network error. Is the server running?'; }
+  btnText.textContent = authMode==='login' ? 'Sign In' : 'Create Account';
+}
+
+function logout() {
+  authToken = null; authUsername = null;
+  localStorage.removeItem('energyiq_token'); localStorage.removeItem('energyiq_username');
+  entries = []; settings = {rate:0.13,currency:'$',co2:0.45};
+  document.getElementById('nav-auth').style.display = '';
+  document.getElementById('nav-user').style.display = 'none';
+  updateAll();
+  showAuthModal(); toast('Signed out.');
+}
+
+async function authFetch(url, options={}) {
+  const headers = {'Content-Type':'application/json', ...options.headers};
+  if(authToken) headers['Authorization'] = 'Bearer '+authToken;
+  const res = await fetch(url, {...options, headers});
+  if(res.status===401) { logout(); return null; }
+  return res;
+}
+
+function selectCategory(btn) {
+  document.querySelectorAll('.cat-btn').forEach(b => { b.classList.remove('selected'); b.style.background=''; b.style.color=''; b.style.borderColor=''; });
+  btn.classList.add('selected');
+  const color = btn.dataset.color;
+  btn.style.background = color; btn.style.color = '#0a0e17'; btn.style.borderColor = color;
+  selectedCat = btn.dataset.cat;
+  const select = document.getElementById('f-appliance');
+  select.innerHTML = CATEGORIES[selectedCat].appliances.map(a => '<option value="'+a+'">'+a+'</option>').join('');
+  const watts = document.getElementById('f-watts');
+  if (!watts.value) watts.value = DEFAULT_WATTS[selectedCat] || 100;
+  updatePreview();
+}
+
+async function fetchElectricityRate() {
+  const priceEl = document.getElementById('price-val');
+  const sourceEl = document.getElementById('price-source');
+  try {
+    const res = await authFetch('/api/electricity-rate');
+    if(!res||!res.ok) throw new Error('error');
+    const data = await res.json();
+    priceEl.textContent  = data.price.toFixed(1)+'c / kWh';
+    sourceEl.textContent = 'Source: '+data.source+' - '+data.period;
+    if(!localStorage.getItem('energyiq_rate_set')) { settings.rate = data.price/100; localStorage.setItem('energyiq_settings',JSON.stringify(settings)); }
+  } catch { priceEl.textContent='13.0c / kWh (est.)'; sourceEl.textContent='Source: EIA 2024 average (fallback)'; }
+}
+
+async function fetchCarbonIntensity() {
+  const el = document.getElementById('carbon-val');
+  try {
+    const res = await authFetch('/api/carbon-intensity');
+    if(!res||!res.ok) throw new Error('error');
+    const data = await res.json();
+    el.textContent = data.carbonIntensity+' gCO2/kWh';
+  } catch { el.textContent = '~450 gCO2/kWh (est.)'; }
+}
+
+function logUsage() {
+  if (!selectedCat)                                   { toast('Please select a category first.'); return; }
+  const appliance = document.getElementById('f-appliance').value;
+  const custom    = document.getElementById('f-custom').value.trim();
+  const watts     = parseFloat(document.getElementById('f-watts').value);
+  const hours     = parseFloat(document.getElementById('f-hours').value);
+  const date      = document.getElementById('f-date').value;
+  const room      = document.getElementById('f-room').value;
+  if (!appliance)           { toast('Please select an activity.'); return; }
+  if (!watts || watts <= 0) { toast('Please enter a valid wattage.'); return; }
+  if (!hours || hours <= 0) { toast('Please enter valid hours.'); return; }
+  if (hours > 24)           { toast('Hours cannot exceed 24.'); return; }
+  if (!date)                { toast('Please select a date.'); return; }
+  const name = custom || appliance;
+  const kwh  = +(watts * hours / 1000).toFixed(4);
+  const cost = +(kwh * settings.rate).toFixed(4);
+  entries.unshift({ id:Date.now(), category:selectedCat, appliance:name, room, watts, hours, kwh, cost, date });
+  localStorage.setItem(entriesKey(), JSON.stringify(entries));
+  document.getElementById('f-custom').value = '';
+  document.getElementById('f-watts').value  = '';
+  document.getElementById('f-hours').value  = '';
+  document.getElementById('calc-preview').classList.remove('show');
+  updateAll(); renderRecentTable();
+  toast('Logged '+kwh+' kWh for '+name+' ('+selectedCat+')');
+}
+
+function updatePreview() {
+  const w = parseFloat(document.getElementById('f-watts').value);
+  const h = parseFloat(document.getElementById('f-hours').value);
+  const el = document.getElementById('calc-preview');
+  if(w && h) { el.textContent = (w*h/1000).toFixed(3)+' kWh estimated - '+settings.currency+(w*h/1000*settings.rate).toFixed(3)+' cost'; el.classList.add('show'); }
+  else el.classList.remove('show');
+}
+
+function deleteEntry(id) {
+  entries = entries.filter(e => e.id !== id);
+  localStorage.setItem(entriesKey(), JSON.stringify(entries));
+  updateAll(); renderTable(); renderRecentTable();
+  toast('Entry removed.');
+}
+
+function getMonthEntries() {
+  const now = new Date(); const y=now.getFullYear(), m=now.getMonth()+1;
+  return entries.filter(e => { const [ey,em]=e.date.split('-').map(Number); return ey===y&&em===m; });
+}
+
+function updateKPIs() {
+  const me = getMonthEntries();
+  const totalKwh  = me.reduce((s,e)=>s+e.kwh,0);
+  const totalCost = me.reduce((s,e)=>s+e.cost,0);
+  document.getElementById('h-kwh').textContent  = totalKwh.toFixed(1);
+  document.getElementById('h-cost').textContent = settings.currency+totalCost.toFixed(2);
+  document.getElementById('h-co2').textContent  = (totalKwh*settings.co2).toFixed(1)+' kg';
+  const days = new Set(me.map(e=>e.date)).size || 1;
+  document.getElementById('kpi-daily').textContent = (totalKwh/days).toFixed(2)+' kWh';
+  const byCat = {}; me.forEach(e=>byCat[e.category]=(byCat[e.category]||0)+e.kwh);
+  const top = Object.entries(byCat).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('kpi-top').textContent  = top ? top[0] : '-';
+  document.getElementById('kpi-logs').textContent = me.length;
+  document.getElementById('kpi-score').textContent = totalKwh<100?'A+':totalKwh<200?'A':totalKwh<350?'B':totalKwh<500?'C':'D';
+  updateCategoryOverview(me, totalKwh);
+}
+
+function updateCategoryOverview(me, totalKwh) {
+  const byCat = {}; Object.keys(CATEGORIES).forEach(c=>byCat[c]=0);
+  me.forEach(e=>{ if(byCat[e.category]!==undefined) byCat[e.category]+=e.kwh; });
+  document.getElementById('cat-overview').innerHTML = Object.entries(CATEGORIES).map(([name,cfg])=>{
+    const kwh = byCat[name]||0;
+    const pct = totalKwh>0 ? (kwh/totalKwh*100) : 0;
+    return '<div class="cat-card" style="border-top-color:'+cfg.color+'"><div class="cat-name" style="color:'+cfg.color+'">'+name+'</div><div class="cat-kwh">'+kwh.toFixed(2)+' kWh</div><div class="cat-kwh">'+settings.currency+(kwh*settings.rate).toFixed(2)+'</div><div class="cat-bar"><div class="cat-bar-fill" style="width:'+pct+'%;background:'+cfg.color+'"></div></div></div>';
+  }).join('');
+}
+
+const BASE_OPTS = {
+  responsive:true, maintainAspectRatio:false,
+  plugins:{ legend:{ labels:{ color:'#94a3b8', font:{family:'DM Sans',size:11}, boxWidth:10 } } },
+  scales:{ x:{ticks:{color:'#475569',font:{family:'DM Sans',size:10}},grid:{color:'rgba(255,255,255,0.04)'}}, y:{ticks:{color:'#475569',font:{family:'DM Sans',size:10}},grid:{color:'rgba(255,255,255,0.06)'}} }
+};
+
+function initCharts() {
+  charts.daily = new Chart(document.getElementById('chart-daily').getContext('2d'), {
+    type:'bar', data:{labels:[],datasets:[{label:'kWh',data:[],backgroundColor:'rgba(56,189,248,0.45)',borderColor:'#38bdf8',borderWidth:1.5,borderRadius:4}]}, options:{...BASE_OPTS}
+  });
+  charts.cat = new Chart(document.getElementById('chart-cat').getContext('2d'), {
+    type:'doughnut',
+    data:{ labels:Object.keys(CATEGORIES), datasets:[{data:[0,0,0,0,0],backgroundColor:Object.values(CATEGORIES).map(c=>c.color),borderWidth:2,borderColor:'#141c2e'}] },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#94a3b8',font:{family:'DM Sans',size:11},boxWidth:10}}}}
+  });
+  charts.cost = new Chart(document.getElementById('chart-cost').getContext('2d'), {
+    type:'line', data:{labels:[],datasets:[{label:'Cost',data:[],borderColor:'#818cf8',backgroundColor:'rgba(129,140,248,0.1)',borderWidth:2,pointRadius:4,pointBackgroundColor:'#818cf8',fill:true,tension:0.4}]}, options:{...BASE_OPTS}
+  });
+  updateCharts();
+}
+
+function updateCharts() {
+  const labels=[],data=[];
+  for(let i=13;i>=0;i--) {
+    const d=new Date(); d.setDate(d.getDate()-i);
+    const key=d.toISOString().split('T')[0];
+    labels.push(d.toLocaleDateString('en',{month:'short',day:'numeric'}));
+    data.push(+(entries.filter(e=>e.date===key).reduce((s,e)=>s+e.kwh,0)).toFixed(3));
+  }
+  charts.daily.data.labels=labels; charts.daily.data.datasets[0].data=data; charts.daily.update();
+
+  const me=getMonthEntries();
+  charts.cat.data.datasets[0].data = Object.keys(CATEGORIES).map(c=>+(me.filter(e=>e.category===c).reduce((s,e)=>s+e.kwh,0)).toFixed(3));
+  charts.cat.update();
+
+  const now=new Date(); const cL=[],cD=[];
+  for(let i=6;i>=0;i--) {
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const y=d.getFullYear(),m=d.getMonth()+1;
+    cL.push(d.toLocaleString('default',{month:'short'}));
+    cD.push(+(entries.filter(e=>{const[ey,em]=e.date.split('-').map(Number);return ey===y&&em===m}).reduce((s,e)=>s+e.cost,0)).toFixed(2));
+  }
+  charts.cost.data.labels=cL; charts.cost.data.datasets[0].data=cD; charts.cost.data.datasets[0].label='Cost ('+settings.currency+')'; charts.cost.update();
+}
+
+function catPill(cat) {
+  const key=(cat||'').toLowerCase().replace('/','').replace(' ','');
+  return '<span class="pill pill-'+key+'">'+(cat||'Other')+'</span>';
+}
+function levelPill(kwh) { return kwh<1?'<span class="pill pill-low">Low</span>':kwh<5?'<span class="pill pill-mid">Medium</span>':'<span class="pill pill-high">High</span>'; }
+function levelKey(kwh) { return kwh<1?'low':kwh<5?'mid':'high'; }
+
+function sortTable(key, th) {
+  if(sortKey===key) sortDir*=-1; else { sortKey=key; sortDir=-1; }
+  document.querySelectorAll('th').forEach(t=>t.classList.remove('sorted'));
+  if(th) th.classList.add('sorted');
+  renderTable();
+}
+
+function renderTable() {
+  const q=((document.getElementById('search-box')||{}).value||'').toLowerCase();
+  const cat=(document.getElementById('filter-cat')||{}).value||'';
+  const room=(document.getElementById('filter-room')||{}).value||'';
+  const level=(document.getElementById('filter-level')||{}).value||'';
+  let rows=[...entries];
+  if(q)     rows=rows.filter(e=>(e.appliance||'').toLowerCase().includes(q)||(e.room||'').toLowerCase().includes(q));
+  if(cat)   rows=rows.filter(e=>e.category===cat);
+  if(room)  rows=rows.filter(e=>e.room===room);
+  if(level) rows=rows.filter(e=>levelKey(e.kwh)===level);
+  rows.sort((a,b)=>{ const va=a[sortKey],vb=b[sortKey]; return typeof va==='string'?sortDir*va.localeCompare(vb):sortDir*(va-vb); });
+  const tbody=document.getElementById('main-tbody');
+  const empty=document.getElementById('table-empty');
+  if(!rows.length){ tbody.innerHTML=''; empty.style.display=''; return; }
+  empty.style.display='none';
+  tbody.innerHTML=rows.map(e=>'<tr><td>'+e.date+'</td><td>'+catPill(e.category)+'</td><td><strong>'+e.appliance+'</strong></td><td>'+e.room+'</td><td>'+e.watts+'W</td><td>'+e.hours+'h</td><td><strong>'+e.kwh+'</strong></td><td>'+settings.currency+e.cost.toFixed(4)+'</td><td>'+levelPill(e.kwh)+'</td><td><button class="btn btn-danger" onclick="deleteEntry('+e.id+')">x</button></td></tr>').join('');
+}
+
+function renderRecentTable() {
+  const tbody=document.getElementById('recent-tbody');
+  const rows=entries.slice(0,6);
+  if(!rows.length){ tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">No entries yet. Log your first activity above.</td></tr>'; return; }
+  tbody.innerHTML=rows.map(e=>'<tr><td>'+e.date+'</td><td>'+catPill(e.category)+'</td><td><strong>'+e.appliance+'</strong></td><td>'+e.room+'</td><td>'+e.watts+'W</td><td>'+e.hours+'h</td><td><strong>'+e.kwh+'</strong></td><td>'+settings.currency+e.cost.toFixed(4)+'</td><td><button class="btn btn-danger" onclick="deleteEntry('+e.id+')">x</button></td></tr>').join('');
+}
+
+function exportCSV() {
+  if(!entries.length){ toast('No data to export.'); return; }
+  const blob=new Blob(['Date,Category,Activity,Room,Watts,Hours,kWh,Cost\n'+entries.map(e=>e.date+','+e.category+','+e.appliance+','+e.room+','+e.watts+','+e.hours+','+e.kwh+','+e.cost.toFixed(4)).join('\n')],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='energyiq_export.csv'; a.click();
+  toast('CSV exported!');
+}
+
+function renderTips() {
+  document.getElementById('tips-general').innerHTML=Object.entries(CAT_TIPS).map(([cat,tip])=>{
+    const color=CATEGORIES[cat].color;
+    return '<div class="tip-card" style="border-left-color:'+color+'"><div class="tip-title" style="color:'+color+'">'+cat+' - '+tip.title+'</div><div class="tip-body">'+tip.body+'</div></div>';
+  }).join('');
+  renderPersonalizedTips();
+}
+
+function renderPersonalizedTips() {
+  const me=getMonthEntries();
+  const byCat={}; me.forEach(e=>byCat[e.category]=(byCat[e.category]||0)+e.kwh);
+  const sorted=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  const total=me.reduce((s,e)=>s+e.kwh,0);
+  const container=document.getElementById('tips-personalized');
+  if(!sorted.length){ container.innerHTML='<div style="color:var(--muted);padding:16px;background:var(--card);border-radius:var(--radius);border:1px solid var(--border)">Log some usage to get personalized tips based on your activity categories.</div>'; return; }
+  const msgs=sorted.slice(0,3).map(([cat,kwh])=>{
+    const pct=total>0?(kwh/total*100).toFixed(0):0;
+    const color=CATEGORIES[cat]?CATEGORIES[cat].color:'#38bdf8';
+    const tip=CAT_TIPS[cat];
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:10px;border-left:3px solid '+color+'"><strong style="color:'+color+'">'+cat+'</strong> accounts for <strong>'+pct+'%</strong> of this month\'s usage ('+kwh.toFixed(2)+' kWh). '+(tip?tip.body:'Review usage frequency to find opportunities to reduce runtime.')+'</div>';
+  });
+  container.innerHTML='<h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:12px">Personalized for You</h3>'+msgs.join('');
+}
+
+function loadSettings() {
+  document.getElementById('s-rate').value=settings.rate;
+  document.getElementById('s-currency').value=settings.currency;
+  document.getElementById('s-co2').value=settings.co2;
+}
+function saveSettings() {
+  settings.rate=parseFloat(document.getElementById('s-rate').value)||0.13;
+  settings.currency=document.getElementById('s-currency').value;
+  settings.co2=parseFloat(document.getElementById('s-co2').value)||0.45;
+  localStorage.setItem(settingsKey(),JSON.stringify(settings));
+  updateAll(); toast('Settings saved!');
+}
+function clearAllData() {
+  if(!confirm('Clear all energy logs? This cannot be undone.')) return;
+  entries=[]; localStorage.removeItem(entriesKey()); updateAll(); toast('All data cleared.');
+}
+function updateAll() { updateKPIs(); updateCharts(); renderPersonalizedTips(); }
+function toast(msg) {
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+</script>
+</body>
+</html>
+

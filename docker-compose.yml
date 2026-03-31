@@ -1,0 +1,60 @@
+version: '3.9'
+
+services:
+
+  # ─── Web server instance 1 ──────────────────────────────────────────────────
+  web01:
+    build: .
+    container_name: energyiq_web01
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - PORT=3000
+      - SERVER_NAME=web01
+    expose:
+      - "3000"
+    networks:
+      - energyiq_net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── Web server instance 2 ──────────────────────────────────────────────────
+  web02:
+    build: .
+    container_name: energyiq_web02
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - PORT=3000
+      - SERVER_NAME=web02
+    expose:
+      - "3000"
+    networks:
+      - energyiq_net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── Nginx load balancer ─────────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: energyiq_lb
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - web01
+      - web02
+    networks:
+      - energyiq_net
+
+networks:
+  energyiq_net:
+    driver: bridge
