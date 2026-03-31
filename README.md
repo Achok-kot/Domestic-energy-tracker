@@ -1,4 +1,8 @@
-A web application that helps users track home energy usage, estimating electricity costs, and monitoring  carbon footprint — powered by real-time data from the EIA and Electricity Maps APIs.
+# EnergyIQ — Domestic Energy Tracker
+
+A web application that helps users track home energy usage, estimate electricity costs, and monitor carbon footprint — powered by real-time data from the EIA and Electricity Maps APIs.
+
+**Live Demo:** http://52.23.253.48 (Load Balancer)
 
 ---
 
@@ -7,11 +11,12 @@ A web application that helps users track home energy usage, estimating electrici
 - **Log Usage** — Record any appliance with wattage, hours used, room, and date
 - **Live Electricity Pricing** — Fetches real residential rates from the U.S. EIA API
 - **Carbon Intensity** — Real-time CO₂ data via Electricity Maps API
-- **Interactive Charts** — Daily kWh bar chart, appliance breakdown doughnut, monthly cost trend line
+- **Interactive Charts** — Daily kWh bar chart, category breakdown doughnut, monthly cost trend line
 - **Sort / Filter / Search** — Full table with sorting by any column, room filter, consumption level filter
 - **CSV Export** — Download all your data as a spreadsheet
-- **Personalized Tips** — Energy-saving advice based on your top-consuming appliances
-- **Persistent Storage** — All entries saved in browser localStorage
+- **Personalized Tips** — Energy-saving advice based on your top-consuming categories
+- **User Authentication** — Secure register/login with JWT tokens and bcrypt password hashing
+- **Per-User Data** — Each user has their own private energy data
 - **Secure API Proxy** — API keys stored server-side in `.env`, never exposed to the browser
 
 ---
@@ -23,9 +28,11 @@ A web application that helps users track home energy usage, estimating electrici
 | Frontend | HTML5, CSS3, Vanilla JavaScript |
 | Charts | [Chart.js 4.4](https://www.chartjs.org/) |
 | Backend | [Node.js](https://nodejs.org/) + [Express 4](https://expressjs.com/) |
-| API Proxy | `node-fetch` |
-| Config | `dotenv` |
-| Web Server | [Nginx](https://nginx.org/) (reverse proxy) |
+| Authentication | JWT + bcryptjs |
+| Caching | In-memory cache middleware |
+| Process Manager | PM2 |
+| Web Server | [Nginx](https://nginx.org/) (reverse proxy + load balancer) |
+| Config | dotenv |
 
 ---
 
@@ -40,6 +47,16 @@ A web application that helps users track home energy usage, estimating electrici
 
 ---
 
+## Servers
+
+| Server | IP Address | Role |
+|--------|-----------|------|
+| Web01 | 44.201.182.188 | Web Server 1 |
+| Web02 | 54.174.109.89 | Web Server 2 |
+| Lb01 | 52.23.253.48 | Load Balancer |
+
+---
+
 ## Running Locally
 
 ### Prerequisites
@@ -48,8 +65,8 @@ A web application that helps users track home energy usage, estimating electrici
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/energyiq.git
-cd energyiq
+git clone https://github.com/Achok-kot/Domestic-energy-tracker.git
+cd Domestic-energy-tracker
 ```
 
 ### 2. Install dependencies
@@ -61,11 +78,14 @@ npm install
 ```bash
 cp .env.example .env
 ```
+
 Edit `.env` and add your API keys:
 ```
 EIA_API_KEY=your_eia_key_here
 ELECTRICITY_MAPS_API_KEY=your_electricity_maps_key_here
+JWT_SECRET=your_long_random_secret_here
 PORT=3000
+SERVER_NAME=local
 ```
 
 **Getting API keys:**
@@ -74,8 +94,9 @@ PORT=3000
 
 ### 4. Start the server
 ```bash
-npm start
+node server.js
 ```
+
 Visit **http://localhost:3000** in your browser.
 
 > **Note:** The app works even without API keys — it falls back to known average values automatically.
@@ -90,53 +111,50 @@ SSH into Web01, then repeat on Web02:
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt-get install -y nodejs
-node -v   # should print v20.x.x
+node -v
 ```
 
-### Step 2 — Copy the application to both servers
+### Step 2 — Clone the repository on both servers
 
-From your local machine:
 ```bash
-scp -r ./energyiq ubuntu@WEB01_IP:/var/www/energyiq
-scp -r ./energyiq ubuntu@WEB02_IP:/var/www/energyiq
+git clone https://github.com/Achok-kot/Domestic-energy-tracker.git
+cd Domestic-energy-tracker
+npm install
 ```
 
 ### Step 3 — Set up .env on each server
 
-SSH into Web01:
 ```bash
-cd /var/www/energyiq
 cp .env.example .env
-nano .env   # paste your real API keys
-npm install --production
+nano .env
 ```
-Repeat on Web02.
 
-### Step 4 — Install PM2 (keeps Node running after logout)
+Fill in your API keys. Make sure **JWT_SECRET is identical on both servers!**
 
-On both servers:
+```
+EIA_API_KEY=your_key_here
+ELECTRICITY_MAPS_API_KEY=your_key_here
+JWT_SECRET=EnergyIQ2025SuperSecretKey123ABC
+PORT=3000
+SERVER_NAME=web01   # change to web02 on second server
+```
+
+### Step 4 — Install PM2 and start the app
+
 ```bash
 sudo npm install -g pm2
-cd /var/www/energyiq
 pm2 start server.js --name energyiq
-pm2 startup    # follow the printed command to enable on boot
 pm2 save
+pm2 startup
+# Run the command it prints
 ```
 
-### Step 5 — Configure Nginx as a reverse proxy on both web servers
+### Step 5 — Configure Nginx as reverse proxy on both web servers
 
-Install Nginx on Web01 and Web02:
 ```bash
 sudo apt install nginx -y
-```
 
-Create config file:
-```bash
-sudo nano /etc/nginx/sites-available/energyiq
-```
-
-Paste:
-```nginx
+sudo bash -c 'cat > /etc/nginx/sites-available/energyiq << EOF
 server {
     listen 80;
     server_name _;
@@ -144,41 +162,34 @@ server {
     location / {
         proxy_pass         http://localhost:3000;
         proxy_http_version 1.1;
-        proxy_set_header   Upgrade $http_upgrade;
-        proxy_set_header   Connection 'upgrade';
-        proxy_set_header   Host $host;
-        proxy_cache_bypass $http_upgrade;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_set_header   Host \$host;
+        proxy_set_header   X-Real-IP \$remote_addr;
+        proxy_cache_bypass \$http_upgrade;
     }
 
-    # Health check endpoint for load balancer
     location /health {
         proxy_pass http://localhost:3000/health;
     }
 }
-```
+EOF'
 
-Enable and restart:
-```bash
-sudo ln -s /etc/nginx/sites-available/energyiq /etc/nginx/sites-enabled/
+sudo ln -sf /etc/nginx/sites-available/energyiq /etc/nginx/sites-enabled/energyiq
+sudo rm /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl restart nginx
 ```
 
-Test: `curl http://WEB01_IP` — you should see the EnergyIQ app.
-
 ### Step 6 — Configure the Load Balancer (Lb01)
 
-SSH into Lb01:
 ```bash
 sudo apt install nginx -y
-sudo nano /etc/nginx/sites-available/energyiq-lb
-```
 
-Paste (replace IPs with your actual Web01/Web02 private IPs):
-```nginx
+sudo bash -c 'cat > /etc/nginx/sites-available/energyiq-lb << EOF
 upstream energyiq_backend {
-    server WEB01_PRIVATE_IP:80;
-    server WEB02_PRIVATE_IP:80;
+    server 44.201.182.188:80;
+    server 54.174.109.89:80;
 }
 
 server {
@@ -187,41 +198,55 @@ server {
 
     location / {
         proxy_pass         http://energyiq_backend;
-        proxy_set_header   Host $host;
-        proxy_set_header   X-Real-IP $remote_addr;
-        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header   Host \$host;
+        proxy_set_header   X-Real-IP \$remote_addr;
+        proxy_set_header   X-Forwarded-For \$proxy_add_x_forwarded_for;
+    }
+
+    location /health {
+        proxy_pass http://energyiq_backend/health;
     }
 }
-```
+EOF'
 
-Enable and restart:
-```bash
-sudo ln -s /etc/nginx/sites-available/energyiq-lb /etc/nginx/sites-enabled/
+sudo ln -sf /etc/nginx/sites-available/energyiq-lb /etc/nginx/sites-enabled/energyiq-lb
+sudo rm /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl restart nginx
 ```
 
 ### Step 7 — Verify load balancing
 
-Run this multiple times and check the server name changes:
 ```bash
-for i in {1..6}; do curl -s http://LB01_IP/health; echo; done
+for i in {1..6}; do curl -s http://52.23.253.48/health; echo; done
 ```
 
-You should see responses alternating between Web01 and Web02.
+You should see responses alternating between web01 and web02.
 
 ---
 
 ## Testing Checklist
 
-- [ ] App loads at `http://WEB01_IP`
-- [ ] App loads at `http://WEB02_IP`
-- [ ] App loads at `http://LB01_IP`
-- [ ] `/health` endpoint returns `{"status":"ok",...}`
-- [ ] Logging a usage entry saves and shows in the table
-- [ ] Dashboard charts update after logging entries
-- [ ] CSV export downloads correctly
-- [ ] Traffic is distributed between Web01 and Web02 (check PM2 logs)
+- [x] App loads at `http://44.201.182.188`
+- [x] App loads at `http://54.174.109.89`
+- [x] App loads at `http://52.23.253.48`
+- [x] `/health` endpoint returns `{"status":"ok",...}`
+- [x] Register and login works
+- [x] Logging a usage entry saves and shows in the table
+- [x] Dashboard charts update after logging entries
+- [x] CSV export downloads correctly
+- [x] Traffic is distributed between Web01 and Web02
+
+---
+
+## Bonus Features Implemented
+
+- **User Authentication** — JWT tokens + bcrypt password hashing
+- **Caching** — In-memory API response caching (1 hour for electricity rates)
+- **Docker** — Dockerfile + docker-compose.yml for containerization
+- **CI/CD Pipeline** — GitHub Actions workflow for automated deployment
+- **Security** — XSS protection, SQL injection prevention, rate limiting, input sanitization
+- **Performance** — API response caching reduces external API calls
 
 ---
 
@@ -229,24 +254,39 @@ You should see responses alternating between Web01 and Web02.
 
 | Challenge | Solution |
 |---|---|
-| API keys can't be in frontend JS | Moved all API calls to an Express proxy server — keys live only in `.env` |
-| App needs to stay running on server | Used PM2 process manager with `pm2 startup` |
-| Load balancer needs to know servers are alive | Added `/health` endpoint; nginx upstream handles failover automatically |
-| EIA/Electricity Maps may be unavailable | Implemented graceful fallback values so the app always works |
+| API keys exposed in terminal logs | Removed key from error messages, stored only in `.env` |
+| Users lost after server restart | Switched from in-memory to file-based user storage |
+| Different users sharing same data | Used per-user localStorage keys |
+| JWT tokens rejected across servers | Set identical JWT_SECRET on both servers |
+| Port 80 conflict on load balancer | Stopped HAProxy, started Nginx |
+| Node.js version conflict on Windows/WSL | Used `/usr/bin/node` directly |
 
 ---
 
 ## Project Structure
 
 ```
-energyiq/
-├── .env.example        # Template for environment variables
-├── .gitignore          # Excludes .env and node_modules
-├── package.json        # Node dependencies
-├── server.js           # Express server + API proxy
+Domestic-energy-tracker/
+├── .env.example            # Template for environment variables
+├── .gitignore              # Excludes .env, node_modules, users.json
+├── package.json            # Node dependencies
+├── server.js               # Express server + API proxy
+├── Dockerfile              # Docker container config
+├── docker-compose.yml      # Multi-container setup
+├── nginx.conf              # Nginx load balancer config
 ├── README.md
+├── .github/
+│   └── workflows/
+│       └── deploy.yml      # CI/CD pipeline
+├── middleware/
+│   ├── auth.js             # JWT authentication
+│   ├── cache.js            # API response caching
+│   └── sanitize.js         # Input validation & XSS protection
+├── routes/
+│   ├── apiRoutes.js        # EIA + Electricity Maps API proxy
+│   └── authRoutes.js       # Register + Login endpoints
 └── public/
-    └── index.html      # Full frontend (HTML + CSS + JS + Chart.js)
+    └── index.html          # Full frontend (HTML + CSS + JS + Chart.js)
 ```
 
 ---
